@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 
+import argparse
 import asyncio
 import csv
-import logging
-from typing import List, Tuple
 import httpx
-import argparse
-from datetime import datetime
-from dataclasses import dataclass, asdict
+import logging
+import os
 import random
 import string
+from dataclasses import dataclass, asdict
+from datetime import datetime
+from dotenv import load_dotenv
+from typing import List, Tuple
+
+load_dotenv()
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +25,12 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+# Default values from environment variables
+DEFAULT_REALM = os.getenv('KEYCLOAK_REALM')
+DEFAULT_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID')
+DEFAULT_CLIENT_SECRET = os.getenv('KEYCLOAK_CLIENT_SECRET')
 
 
 @dataclass
@@ -205,26 +216,31 @@ def main():
     # Create command
     create_parser = subparsers.add_parser("create", help="Create users from CSV file")
     create_parser.add_argument("--csv", required=True, help="CSV file with username;password")
-    create_parser.add_argument("--realm", required=True, help="Keycloak realm")
-    create_parser.add_argument("--client-id", required=True, help="Client ID")
-    create_parser.add_argument("--client-secret", required=True, help="Client Secret")
+    create_parser.add_argument("--realm", default=DEFAULT_REALM, help=f"Keycloak realm")
+    create_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
+    create_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
 
     # Delete command
     delete_parser = subparsers.add_parser("delete", help="Delete users from CSV file")
     delete_parser.add_argument("--csv", required=True, help="CSV file with username;password")
-    delete_parser.add_argument("--realm", required=True, help="Keycloak realm")
-    delete_parser.add_argument("--client-id", required=True, help="Client ID")
-    delete_parser.add_argument("--client-secret", required=True, help="Client Secret")
+    delete_parser.add_argument("--realm", default=DEFAULT_REALM, help=f"Keycloak realm")
+    delete_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
+    delete_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
 
     # Generate command
     generate_parser = subparsers.add_parser("generate", help="Generate CSV file with random users")
     generate_parser.add_argument("--count", type=int, required=True, help="Number of users to generate")
     generate_parser.add_argument("--output", required=True, help="Output CSV file")
-    generate_parser.add_argument("--prefix", default="user", help="Username prefix")
+    generate_parser.add_argument("--prefix", default="user_", help="Username prefix")
 
     args = parser.parse_args()
 
     if args.command in ["create", "delete"]:
+        if not (args.realm and args.client_id and args.client_secret):
+            logger.error("Please specify all required params via CLI or environment variable")
+            parser.print_help()
+            return
+
         asyncio.run(process_users(
             args.command,
             args.csv,
