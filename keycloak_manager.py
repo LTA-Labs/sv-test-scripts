@@ -86,6 +86,7 @@ class KcAdmin:
                 json={
                     "username": username,
                     "email": email,
+                    "emailVerified": True,
                     "enabled": True,
                     "credentials": [{
                         "type": "password",
