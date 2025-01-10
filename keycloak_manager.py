@@ -13,18 +13,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 from typing import List, Tuple
 
+from sv_test_logger import logger
+
 load_dotenv()
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('keycloak-users.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
 
 
 # Default values from environment variables
