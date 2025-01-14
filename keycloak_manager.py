@@ -13,7 +13,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from typing import List, Tuple
 
-from sv_test_logger import logger
+from config import logger
 
 load_dotenv()
 
