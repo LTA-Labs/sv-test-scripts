@@ -178,10 +178,10 @@ class SecretVaultSubmitter:
 def main(stage):
     # Example secret submission
     secret = SecretSubmission(
-        name="Test Secret Again",
+        name="Test Secret",
         type="text",
         tag="password",
-        text="This is a test secret again",
+        text="This is a test secret",
         keepic_path="./keepic.jpg"
     )
 

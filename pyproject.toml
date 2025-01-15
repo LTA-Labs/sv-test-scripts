@@ -12,6 +12,7 @@ python-dotenv = "^1.0.0"
 beautifulsoup4 = "^4.12.3"
 python-jose = "^3.3.0"
 selenium = "^4.27.1"
+webdriver-manager = "^4.0.2"
 
 
 [build-system]

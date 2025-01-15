@@ -3,11 +3,12 @@ import sys
 from dataclasses import dataclass
 
 # Logging config
+logging_file = 'sv-test-scripts.log'
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(module)s - %(message)s',
     handlers=[
-        logging.FileHandler('keycloak-users.log'),
+        logging.FileHandler(logging_file),
         logging.StreamHandler(sys.stdout)
     ]
 )

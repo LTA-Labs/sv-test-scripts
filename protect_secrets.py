@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 from typing import Dict
 from sv_secret_submitter import SecretVaultSubmitter, SecretSubmission
-from config import logger
+from config import logger, logging_file
 
 
 def validate_file_path(file_path: str) -> bool:
@@ -140,7 +140,7 @@ def main(stage: str):
     logger.info(f"Total records processed: {results['total']}")
     logger.info(f"Successful protections: {results['success']}")
     logger.info(f"Failed protections: {results['failed']}")
-    logger.info("Complete logs available in: secret_protection.log")
+    logger.info(f"Complete logs available in: {logging_file}")
 
 
 if __name__ == "__main__":
