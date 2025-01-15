@@ -24,7 +24,7 @@ class ServerData:
     client_id: str
 
 
-DOMAIN_TEMPLATE = "https://{stage}.secretsvault.net"
+DOMAIN_TEMPLATE = "https://{}.secretsvault.net"
 
 STAGES = {
     'dev': ServerData(

@@ -4,7 +4,6 @@ import argparse
 import asyncio
 import csv
 import httpx
-import logging
 import os
 import random
 import string
@@ -13,7 +12,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from typing import List, Tuple
 
-from config import logger
+from config import default_environment, logger, ServerData, STAGES
+from sv_oidc_auth import OIDCAuth
 
 load_dotenv()
 
@@ -47,9 +47,14 @@ class KcUser:
 
 
 class KcAdmin:
-    BASE_URL = "https://auth-dev.secretsvault.net"
 
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(self, client_id: str, client_secret: str, stage: str = default_environment):
+        server_data: ServerData = STAGES.get(stage)
+        if server_data is None:
+            raise ValueError(f"Stage value '{stage}' is not valid")
+        self.stage = stage
+        self.base_url = server_data.kc_url
+        self.api_url = server_data.api_url
         self._client_id = client_id
         self._client_secret = client_secret
         self._client = httpx.AsyncClient()
@@ -64,16 +69,16 @@ class KcAdmin:
 
     async def get_users(self, realm: str, page: int = 0, page_size: int = 100):
         return await self._get(
-            f"{self.BASE_URL}/admin/realms/{realm}/users?first={page}&max={page_size}"
+            f"{self.base_url}/admin/realms/{realm}/users?first={page}&max={page_size}"
         )
 
     async def get_user(self, realm: str, user_id):
-        return await self._get(f"{self.BASE_URL}/admin/realms/{realm}/users/{user_id}")
+        return await self._get(f"{self.base_url}/admin/realms/{realm}/users/{user_id}")
 
-    async def create_user(self, realm: str, username: str, email: str, password: str) -> bool:
+    async def create_user(self, realm: str, username: str, email: str, password: str, set_free_license: bool) -> bool:
         try:
             response = await self._post(
-                f"{self.BASE_URL}/admin/realms/{realm}/users",
+                f"{self.base_url}/admin/realms/{realm}/users",
                 json={
                     "username": username,
                     "email": email,
@@ -87,6 +92,36 @@ class KcAdmin:
                 }
             )
             logger.info(f"User created successfully: {username}")
+
+            if set_free_license:
+                auth = OIDCAuth(self.stage)
+                auth_info = await auth.kc_authenticate()
+                if auth_info:
+                    logger.info(f"=== {username}: Keycloak authentication successful! ===")
+                    sv_token = await auth.sv_authenticate(auth_info.get('access_token'))
+                    if sv_token:
+                        logger.info(f"=== {username}: SV authentication successful! ===")
+                        response = await self._client.post(
+                            url=f"{self.api_url}/license/select_license",
+                            json={
+                                "license_id": "portal_lite",
+                                "is_yearly": False,
+                                "lang": ""
+                            },
+                            headers={
+                                "Authorization": f"Bearer {sv_token}"
+                            }
+                        )
+                        try:
+                            response.raise_for_status()
+                            logger.info(f"=== {username}: Free license assigned successfully! ===")
+                        except httpx.HTTPError as e:
+                            logger.error(f"Failed to assign free license to {username}: {str(e)}")
+                    else:
+                        logger.error(f"=== {username}: SV authentication failed! ===")
+                else:
+                    logger.error(f"=== {username}: Keycloak authentication failed! ===")
+
             return True
         except httpx.HTTPError as e:
             logger.error(f"Failed to create user {username}: {str(e)}")
@@ -102,7 +137,7 @@ class KcAdmin:
                 logger.warning(f"User not found: {username}")
                 return False
 
-            await self._delete(f"{self.BASE_URL}/admin/realms/{realm}/users/{user['id']}")
+            await self._delete(f"{self.base_url}/admin/realms/{realm}/users/{user['id']}")
             logger.info(f"User deleted successfully: {username}")
             return True
         except httpx.HTTPError as e:
@@ -111,7 +146,7 @@ class KcAdmin:
 
     def _get_token(self):
         response: httpx.Response = httpx.post(
-            f"{self.BASE_URL}/realms/master/protocol/openid-connect/token",
+            f"{self.base_url}/realms/master/protocol/openid-connect/token",
             data={
                 "scope": "openid",
                 "grant_type": "client_credentials",
@@ -155,7 +190,8 @@ class KcAdmin:
         return await self._client.delete(url)
 
 
-async def process_users(action: str, csv_file: str, realm: str, client_id: str, client_secret: str):
+async def process_users(action: str, csv_file: str, realm: str,
+                        client_id: str, client_secret: str, set_free_license: bool):
     async with KcAdmin(client_id, client_secret) as admin:
         with open(csv_file, 'r') as f:
             reader = csv.reader(f, delimiter=';')
@@ -175,7 +211,7 @@ async def process_users(action: str, csv_file: str, realm: str, client_id: str, 
             for username, password in batch:
                 if action == "create":
                     email = f"{username}@example.com"  # Generate email based on username
-                    task = admin.create_user(realm, username, email, password)
+                    task = admin.create_user(realm, username, email, password, set_free_license)
                 else:
                     task = admin.delete_user(realm, username)
                 tasks.append(task)
@@ -211,6 +247,7 @@ def main():
     create_parser.add_argument("--realm", default=DEFAULT_REALM, help=f"Keycloak realm")
     create_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
     create_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
+    create_parser.add_argument("--set-free-license", default=False, help="Automatically set free license")
 
     # Delete command
     delete_parser = subparsers.add_parser("delete", help="Delete users from CSV file")
@@ -227,7 +264,21 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command in ["create", "delete"]:
+    if args.command == "create":
+        if not (args.realm and args.client_id and args.client_secret):
+            logger.error("Please specify all required params via CLI or environment variable")
+            parser.print_help()
+            return
+
+        asyncio.run(process_users(
+            args.command,
+            args.csv,
+            args.realm,
+            args.client_id,
+            args.client_secret,
+            args.set_free_license
+        ))
+    elif args.command == "delete":
         if not (args.realm and args.client_id and args.client_secret):
             logger.error("Please specify all required params via CLI or environment variable")
             parser.print_help()

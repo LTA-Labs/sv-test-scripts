@@ -7,7 +7,7 @@ import secrets
 from bs4 import BeautifulSoup
 from datetime import datetime
 from dotenv import load_dotenv
-from typing import Literal, Optional
+from typing import Optional
 from urllib.parse import urlencode, parse_qs
 
 from config import logger, default_environment, ServerData, STAGES
@@ -31,7 +31,6 @@ class OIDCAuth:
         self.state = secrets.token_urlsafe(32)
 
     def _create_code_challenge(self) -> str:
-        """Create PKCE code challenge from verifier"""
         hash_value = hashlib.sha256(self.code_verifier.encode()).digest()
         return base64.urlsafe_b64encode(hash_value).decode().rstrip('=')
 
