@@ -2,7 +2,7 @@ import csv
 from pathlib import Path
 from typing import Dict
 from sv_secret_submitter import SecretVaultSubmitter, SecretSubmission
-from config import logger, logging_file
+from config import logger, logging_file, default_environment
 
 
 def validate_file_path(file_path: str) -> bool:
@@ -117,7 +117,7 @@ def generate_sample_csv(output_file: str, num_records: int = 5):
         logger.error(f"Error generating sample CSV: {str(e)}")
 
 
-def main(stage: str):
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Secret Protection Tool')
@@ -126,6 +126,8 @@ def main(stage: str):
                         help='Generate a sample CSV file')
     parser.add_argument('--num-records', type=int, default=1,
                         help='Number of records for sample generation')
+    parser.add_argument('--stage', type=str, default=default_environment,
+                        help='Environment stage to be tested (dev, test, or prod)')
 
     args = parser.parse_args()
 
@@ -134,7 +136,7 @@ def main(stage: str):
         return
 
     logger.info("Starting secret protection process")
-    results = process_secrets_file(args.csv, stage)
+    results = process_secrets_file(args.csv, args.stage)
 
     logger.info("=== Final Results ===")
     logger.info(f"Total records processed: {results['total']}")
@@ -144,5 +146,4 @@ def main(stage: str):
 
 
 if __name__ == "__main__":
-    stage = 'prod'
-    main(stage)
+    main()
