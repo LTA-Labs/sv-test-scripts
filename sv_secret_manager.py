@@ -18,15 +18,15 @@ load_dotenv()
 
 
 @dataclass
-class SecretSubmission:
+class Secret:
     name: str
     type: str
     tag: str
-    text: str
+    content: str
     keepic_path: str
 
 
-class SecretVaultSubmitter:
+class SecretVaultManager:
     def __init__(self, stage: str = default_environment, headless: bool = False):
         server_data: ServerData = STAGES.get(stage)
         if server_data is None:
@@ -66,8 +66,8 @@ class SecretVaultSubmitter:
             # Navigate to main application (will redirect to auth)
             self.driver.get(self.base_url)
 
-            # Disable tour using JavaScript
-            script = "localStorage.setItem('onboarding', true);"
+            # Disable tour and set language using JavaScript
+            script = "localStorage.setItem('onboarding', true); localStorage.setItem('selectedLanguage', 'English')"
             self.driver.execute_script(script)
 
             # Wait for redirect to Keycloak login page
@@ -116,9 +116,29 @@ class SecretVaultSubmitter:
             logger.error(f"Authentication failed: {str(e)}")
             return False
 
-    def submit_secret(self, secret: SecretSubmission) -> bool:
+    def validate_secret(self, secret: Secret) -> bool:
+        """Validate secret content matches its type."""
+        if secret.type not in ['text', 'file']:
+            logger.error(f"Invalid secret type: {secret.type}")
+            return False
+
+        if secret.type == 'file':
+            if not Path(secret.content).is_file():
+                logger.error(f"File not found: {secret.content}")
+                return False
+        elif secret.type == 'text':
+            if not isinstance(secret.content, str):
+                logger.error("Text secret content must be a string")
+                return False
+
+        return True
+
+    def backup_secret(self, secret: Secret) -> bool:
         """Submit a new secret through the web interface."""
         try:
+            if not self.validate_secret(secret):
+                return False
+
             # Navigate to add secret page
             self.driver.get(f"{self.base_url}/add-secret")
 
@@ -127,25 +147,43 @@ class SecretVaultSubmitter:
             if not form:
                 return False
 
-            # Fill in form fields
-            name_input = self._wait_for_element(By.ID, "input")
-            secret_input = self._wait_for_element(By.ID, "textarea")
-            keepic_input = self._wait_for_element(By.ID, 'fileInput')
-            if not all([name_input, secret_input, keepic_input]):
-                logger.error("Failed to find all form elements")
+            # Fill in secret name
+            name_input = form.find_element(By.ID, "input")
+            if not name_input:
                 return False
-
-            # Fill in the form
             name_input.send_keys(secret.name)
-            secret_input.send_keys(secret.text)
+
+            # Select secret type
+            second_step_div = form.find_element(
+                By.XPATH,
+                f"//div[contains(@class, 'second-step')]"
+            )
+            type_button = second_step_div.find_element(
+                By.XPATH,
+                f"//button[normalize-space()='{secret.type.capitalize()}']"
+            )
+            if not type_button:
+                logger.error(f"Could not find button for secret type: {secret.type}")
+                return False
+            type_button.click()
+
+            # Handle secret content based on type
+            if secret.type == 'text':
+                secret_input = self._wait_for_element(By.ID, "textarea")
+                if not secret_input:
+                    return False
+                secret_input.send_keys(secret.content)
+            else:  # file type
+                file_input = second_step_div.find_element(By.CSS_SELECTOR, "input[type='file']")
+                if not file_input:
+                    return False
+                file_input.send_keys(str(Path(secret.content).absolute()))
 
             # Upload keepic file
-            keepic_path = Path(secret.keepic_path)
-            if not keepic_path.exists():
-                logger.error(f"Keepic file not found: {secret.keepic_path}")
+            keepic_input = self._wait_for_element(By.ID, 'fileInput')
+            if not keepic_input:
                 return False
-
-            keepic_input.send_keys(str(keepic_path.absolute()))
+            keepic_input.send_keys(str(Path(secret.keepic_path).absolute()))
 
             # Submit the form
             submit_button = self._wait_for_element(
@@ -155,7 +193,6 @@ class SecretVaultSubmitter:
             if not submit_button:
                 return False
             submit_button.click()
-            # self.driver.execute_script("arguments[0].click();", submit_button)
 
             # Wait for success message or indicator
             success = self._wait_for_element(
@@ -164,17 +201,17 @@ class SecretVaultSubmitter:
             )
 
             if not success:
-                logger.error("Failed to verify successful secret submission")
+                logger.error("Failed to verify successful secret backup")
                 return False
 
-            logger.info(f"Successfully submitted secret: {secret.name}")
+            logger.info(f"Successfully backed up secret: {secret.name}")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to submit secret: {str(e)}")
+            logger.error(f"Failed to backup secret: {str(e)}")
             return False
 
-    def restore_secret(self, secret: SecretSubmission) -> bool:
+    def restore_secret(self, secret: Secret) -> bool:
         """Restores a secret through the web interface."""
         try:
             # Navigate to secrets page
@@ -227,11 +264,10 @@ class SecretVaultSubmitter:
             if not submit_button:
                 return False
             submit_button.click()
-            # self.driver.execute_script("arguments[0].click();", submit_button)
 
             # Wait for the recovery process to finish
             # Wait for success message
-            success = self._wait_for_element(
+            self._wait_for_element(
                 By.CSS_SELECTOR,
                 'i.fa-check-circle'  # success icon
             )
@@ -244,33 +280,33 @@ class SecretVaultSubmitter:
 
 def main(stage: str):
     # Example secret submission
-    secret = SecretSubmission(
+    secret = Secret(
         name="Test Secret",
-        type="text",
-        tag="password",
-        text="This is a test secret",
+        type="file",
+        tag="",
+        content="./keepic.jpg",
         keepic_path="./keepic.jpg"
     )
 
-    with SecretVaultSubmitter(stage=stage, headless=False) as submitter:
+    with SecretVaultManager(stage=stage, headless=False) as manager:
         # Authenticate first
-        if not submitter.authenticate():
+        if not manager.authenticate():
             logger.error("Authentication failed")
             return
 
-        # Submit the secret
-        if submitter.submit_secret(secret):
-            logger.info("Secret submitted successfully")
+        # Backup the secret
+        if manager.backup_secret(secret):
+            logger.info("Secret backed up successfully")
         else:
-            logger.error("Failed to submit secret")
+            logger.error("Failed to backup secret")
 
-        # Recover the secret
-        if submitter.restore_secret(secret):
-            logger.info("Secret submitted successfully")
+        # Restore the secret
+        if manager.restore_secret(secret):
+            logger.info("Secret restored successfully")
         else:
-            logger.error("Failed to submit secret")
+            logger.error("Failed to restore secret")
 
 
 if __name__ == "__main__":
-    stage = 'prod'
+    stage = 'dev'
     main(stage)
