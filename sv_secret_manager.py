@@ -292,8 +292,12 @@ class SecretVaultManager:
             if not recover_button:
                 logger.error(f"Could not find 'Recover' button for secret: {secret.name}")
                 return False
+
             # Click the "Recover" button
-            recover_button.click()
+            # recover_button.click()
+            # Prevents that button from being clickable because the tour is being displayed overlaid on it
+            self.driver.execute_script("arguments[0].click();", recover_button)
+
             # Find the keepic input field
             keepic_input = self._wait_for_element(By.ID, 'fileInput')
             if not keepic_input:
@@ -318,7 +322,9 @@ class SecretVaultManager:
             )
             if not submit_button:
                 return False
-            submit_button.click()
+            # submit_button.click()
+            # Prevents that button from being clickable because the tour is being displayed overlaid on it
+            self.driver.execute_script("arguments[0].click();", submit_button)
 
             # Wait for the recovery process to finish
             # Wait for success message
