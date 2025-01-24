@@ -216,7 +216,9 @@ class SecretVaultManager:
             if not type_button:
                 logger.error(f"Could not find button for secret type: {secret.type}")
                 return False
-            type_button.click()
+            # type_button.click()
+            # Prevents that button from being clickable because the tour is being displayed overlaid on it
+            self.driver.execute_script("arguments[0].click();", type_button)
 
             # Handle secret content based on type
             if secret.type == 'text':
@@ -242,7 +244,9 @@ class SecretVaultManager:
                              .find_element(By.XPATH, './/button[normalize-space(text())="Save"]'))  # Look inside the sibling div for a button with the text 'Save'
             if not submit_button:
                 return False
-            submit_button.click()
+            # submit_button.click()
+            # Prevents that button from being clickable because the tour is being displayed overlaid on it
+            self.driver.execute_script("arguments[0].click();", submit_button)
 
             # Wait for success message or indicator
             success = self._wait_for_element(

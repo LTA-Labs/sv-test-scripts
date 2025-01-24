@@ -27,7 +27,7 @@ SELENIUM_CONFIG = {
         # 'options': ['--headless']
     },
     'remote': {
-        'command_executor': 'https://sel-pre.secretsvault.net:4444/',  # Default Grid hub URL
+        'command_executor': 'http://sel-pre.secretsvault.net:4444',  # Default Grid hub URL
         'browser': 'chrome',
         'options': [
             '--headless',                    # Run in headless mode (no graphical interface)
@@ -41,6 +41,9 @@ SELENIUM_CONFIG = {
             '--no-default-browser-check',    # Skip default browser verification
             # '--window-size=1920,1080',       # Set a window size for headless tests
             # '--remote-debugging-port=9222'   # Enable remote debugging (useful for debugging in Selenium Grid)
+            '--ignore-certificate-errors',
+            '--ignore-ssl-errors',
+            '--allow-insecure-localhost'
         ]
     }
 }
