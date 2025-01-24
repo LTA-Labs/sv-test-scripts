@@ -100,7 +100,7 @@ python manage_secrets.py restore --csv secrets.csv --stage prod
 ```
 
 - `--csv`: Path to the CSV file containing the secrets.
-- `--stage`: Target environment (e.g., `prod`, `dev`).
+- `--stage`: Target environment (e.g., `prod`, `dev`, `test`).
 
 ---
 
