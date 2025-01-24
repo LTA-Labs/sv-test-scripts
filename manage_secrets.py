@@ -155,8 +155,8 @@ def main():
     common_parser.add_argument('--csv', required=True, help='Path to CSV file with secret data')
     common_parser.add_argument('--stage', type=str, default=default_environment,
                                help='Stage to be tested', choices=['dev', 'test', 'prod'])
-    common_parser.add_argument('--remote', action='store_true',
-                               help='Use remote Selenium Grid instead of local WebDriver')
+    common_parser.add_argument('--local', action='store_true',
+                               help='Use local WebDriver instead of remote Selenium Grid')
 
     # Backup command
     backup_parser = subparsers.add_parser('backup', help='Backup secrets from CSV file',
@@ -177,7 +177,7 @@ def main():
         return
 
     logger.info(f"Starting secret {args.command} process")
-    results = process_secrets_file(args.csv, args.stage, args.command, remote=getattr(args, 'remote', False))
+    results = process_secrets_file(args.csv, args.stage, args.command, remote=not getattr(args, 'local', False))
 
     logger.info("=== Final Results ===")
     logger.info(f"Total records processed: {results['total']}")
