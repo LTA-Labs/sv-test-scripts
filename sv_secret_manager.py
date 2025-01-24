@@ -186,10 +186,9 @@ class SecretVaultManager:
             keepic_input.send_keys(str(Path(secret.keepic_path).absolute()))
 
             # Submit the form
-            submit_button = self._wait_for_element(
-                By.XPATH,
-                '/html/body/div[1]/div/div[2]/div/div[2]/div[2]/div/div[2]/div[2]/div[2]/div[3]/button'
-            )
+            submit_button = (form.find_element(By.XPATH, './..')  # find parent div
+                             .find_element(By.XPATH, 'following-sibling::div')  # find adjacent sibling
+                             .find_element(By.XPATH, './/button[normalize-space(text())="Save"]'))  # Look inside the sibling div for a button with the text 'Save'
             if not submit_button:
                 return False
             submit_button.click()
