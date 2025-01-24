@@ -1,5 +1,6 @@
-from dataclasses import dataclass
 import os
+import requests
+from dataclasses import dataclass
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -12,7 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 from typing import Optional
 
-from config import default_environment, logger, ServerData, STAGES
+from config import default_environment, DEFAULT_IMAGE_URL, logger, SELENIUM_CONFIG, ServerData, STAGES
 
 load_dotenv()
 
@@ -27,29 +28,96 @@ class Secret:
 
 
 class SecretVaultManager:
-    def __init__(self, stage: str = default_environment, headless: bool = False):
+    def __init__(self, stage: str = default_environment, remote: bool = False):
         server_data: ServerData = STAGES.get(stage)
         if server_data is None:
             raise ValueError(f"Stage value '{stage}' is not valid")
         self.base_url = server_data.portal_url
         self.auth_url = server_data.kc_url
-        self.options = Options()
-        if headless:
-            self.options.add_argument("--headless")
-            self.options.add_argument("--no-sandbox")
-            self.options.add_argument("--disable-dev-shm-usage")
+        self.remote = remote
         self.driver = None
         self.wait = None
 
+    def _setup_driver(self):
+        """Initialize WebDriver with local or remote configuration"""
+        try:
+            config = SELENIUM_CONFIG['remote' if self.remote else 'local']
+            options = Options()
+
+            # Add browser options
+            for option in config['options']:
+                options.add_argument(option)
+
+            if self.remote:
+                # Remote WebDriver (Selenium Grid)
+                grid_url = config['command_executor']
+                self.driver = webdriver.Remote(
+                    command_executor=grid_url,
+                    options=options
+                )
+                logger.info(f"Connected to Selenium Grid at {grid_url}")
+            else:
+                # Local WebDriver
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=options)
+                logger.info("Using local Chrome WebDriver")
+
+            self.wait = WebDriverWait(self.driver, 30)
+
+        except Exception as e:
+            logger.error(f"Failed to initialize WebDriver: {str(e)}")
+            raise
+
     def __enter__(self):
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=self.options)
-        self.wait = WebDriverWait(self.driver, 60)
+        self._setup_driver()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.driver:
             self.driver.quit()
+
+    @staticmethod
+    def _validate_file(file_path: str, file_type: str = 'keepic') -> str:
+        """Validate file existence and return file path or download default image"""
+        path = Path(file_path)
+        if not path.exists():
+            logger.warning(f"{file_type} file not found: {file_path}, downloading default image")
+            try:
+                # Create parent directories if they don't exist
+                path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Download the default image
+                response = requests.get(DEFAULT_IMAGE_URL)
+                response.raise_for_status()
+                with open(path, 'wb') as f:
+                    f.write(response.content)
+
+                logger.info(f"Successfully downloaded default image to {file_path}")
+                return str(path)
+            except Exception as e:
+                logger.error(f"Failed to download default image: {str(e)}")
+                raise e
+        return str(path)
+
+    def _validate_secret(self, secret: Secret) -> bool:
+        """Validate secret fields."""
+        try:
+            if secret.type not in ['text', 'file']:
+                logger.error(f"Invalid secret type: {secret.type}")
+                return False
+
+            if secret.type == 'text':
+                if not isinstance(secret.content, str):
+                    logger.error("Text secret content must be a string")
+                    return False
+            elif secret.type == 'file':
+                secret.content = self._validate_file(secret.content, 'secret')
+
+            secret.keepic_path = self._validate_file(secret.keepic_path, 'keepic')
+        except Exception as e:
+            return False
+
+        return True
 
     def _wait_for_element(self, by: By, value: str) -> Optional[webdriver.Remote]:
         try:
@@ -116,27 +184,10 @@ class SecretVaultManager:
             logger.error(f"Authentication failed: {str(e)}")
             return False
 
-    def validate_secret(self, secret: Secret) -> bool:
-        """Validate secret content matches its type."""
-        if secret.type not in ['text', 'file']:
-            logger.error(f"Invalid secret type: {secret.type}")
-            return False
-
-        if secret.type == 'file':
-            if not Path(secret.content).is_file():
-                logger.error(f"File not found: {secret.content}")
-                return False
-        elif secret.type == 'text':
-            if not isinstance(secret.content, str):
-                logger.error("Text secret content must be a string")
-                return False
-
-        return True
-
     def backup_secret(self, secret: Secret) -> bool:
         """Submit a new secret through the web interface."""
         try:
-            if not self.validate_secret(secret):
+            if not self._validate_secret(secret):
                 return False
 
             # Navigate to add secret page
@@ -213,6 +264,7 @@ class SecretVaultManager:
     def restore_secret(self, secret: Secret) -> bool:
         """Restores a secret through the web interface."""
         try:
+            secret.keepic_path = self._validate_file(secret.keepic_path, 'keepic')
             # Navigate to secrets page
             self.driver.get(f"{self.base_url}/secrets")
             # Wait for a star icon to ensure page was loaded

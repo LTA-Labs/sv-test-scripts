@@ -15,6 +15,37 @@ logging.basicConfig(
 logger = logging.getLogger("sv-test-scripts")
 
 
+# Default image URL for missing files
+DEFAULT_IMAGE_URL = "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U"
+
+# Selenium configuration
+SELENIUM_CONFIG = {
+    'local': {
+        'command_executor': None,  # None means local WebDriver
+        'browser': 'chrome',
+        'options': []
+        # 'options': ['--headless']
+    },
+    'remote': {
+        'command_executor': 'https://sel-pre.secretsvault.net:4444/',  # Default Grid hub URL
+        'browser': 'chrome',
+        'options': [
+            '--headless',                    # Run in headless mode (no graphical interface)
+            '--no-sandbox',                  # Avoid sandboxing restrictions (useful in containers)
+            '--disable-dev-shm-usage',       # Prevent errors due to shared memory limitations (also useful in containers)
+            '--disable-gpu',                 # Disable GPU for headless testing (in case of compatibility issues)
+            '--disable-extensions',          # Disable extensions to reduce unnecessary load
+            '--disable-notifications',       # Prevent browser notifications
+            '--blink-settings=imagesEnabled=false', # Disable image loading for faster execution
+            '--no-first-run',                # Skip browser's first run checks
+            '--no-default-browser-check',    # Skip default browser verification
+            # '--window-size=1920,1080',       # Set a window size for headless tests
+            # '--remote-debugging-port=9222'   # Enable remote debugging (useful for debugging in Selenium Grid)
+        ]
+    }
+}
+
+
 # Servers URL definition
 @dataclass
 class ServerData:
@@ -51,4 +82,4 @@ STAGES = {
     )
 }
 
-default_environment = 'dev'
+default_environment = 'prod'

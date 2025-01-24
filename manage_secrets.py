@@ -14,7 +14,7 @@ def validate_file_path(file_path: str) -> bool:
     return True
 
 
-def process_csv_record(record: Dict[str, str], stage: str, operation: str) -> bool:
+def process_csv_record(record: Dict[str, str], stage: str, operation: str, remote: bool = False) -> bool:
     """Process a single CSV record for secret backup or restore."""
     try:
         # Validate required fields
@@ -25,12 +25,12 @@ def process_csv_record(record: Dict[str, str], stage: str, operation: str) -> bo
                 return False
 
         # Validate files exist for file/image type secrets and keepic
-        if record['secret_type'] == 'file':
-            if not validate_file_path(record['secret']):
-                return False
-
-        if not validate_file_path(record['keepic']):
-            return False
+        # if record['secret_type'] == 'file':
+        #     if not validate_file_path(record['secret']):
+        #         return False
+        #
+        # if not validate_file_path(record['keepic']):
+        #     return False
 
         # Create secret submission object
         secret = Secret(
@@ -42,7 +42,7 @@ def process_csv_record(record: Dict[str, str], stage: str, operation: str) -> bo
         )
 
         # Process secret using the manager
-        with SecretVaultManager(stage=stage, headless=False) as manager:
+        with SecretVaultManager(stage=stage, remote=remote) as manager:
             logger.info(f"Attempting to {operation} secret for user: {record['username']}")
 
             # Authenticate
@@ -68,7 +68,7 @@ def process_csv_record(record: Dict[str, str], stage: str, operation: str) -> bo
         return False
 
 
-def process_secrets_file(csv_file: str, stage: str, operation: str) -> Dict[str, int]:
+def process_secrets_file(csv_file: str, stage: str, operation: str, remote: bool = False) -> Dict[str, int]:
     """Process all records in the CSV file."""
     results = {
         "total": 0,
@@ -84,7 +84,7 @@ def process_secrets_file(csv_file: str, stage: str, operation: str) -> Dict[str,
                 results["total"] += 1
                 logger.info(f"Processing record {results['total']}")
 
-                if process_csv_record(record, stage, operation):
+                if process_csv_record(record, stage, operation, remote):
                     results["success"] += 1
                 else:
                     results["failed"] += 1
@@ -103,9 +103,10 @@ def generate_sample_csv(output_file: str, num_records: int = 5):
         headers = ['username', 'password', 'secret_type', 'secret', 'secret_desc', 'keepic']
 
         # Create a sample file for file-type secrets if it doesn't exist
-        sample_file = Path('sample_secret.txt')
-        if not sample_file.exists():
-            sample_file.write_text('This is a sample file secret')
+        sample_content = Path('sample_secret.jpg')
+        sample_keepic = Path('sample_keepic.jpg')
+        # if not sample_file.exists():
+        #     sample_file.write_text('This is a sample file secret')
 
         with open(output_file, 'w', newline='') as f:
             writer = csv.writer(f, delimiter=';')
@@ -120,7 +121,7 @@ def generate_sample_csv(output_file: str, num_records: int = 5):
                 if secret_type == 'text':
                     secret_content = f'This is secret #{i + 1}'
                 else:
-                    secret_content = str(sample_file)
+                    secret_content = str(sample_content)
 
                 writer.writerow([
                     f'user{i + 1}',  # username
@@ -128,7 +129,7 @@ def generate_sample_csv(output_file: str, num_records: int = 5):
                     secret_type,  # secret_type
                     secret_content,  # secret
                     f'Sample Secret {i + 1}',  # secret_desc
-                    './keepic.jpg'  # keepic
+                    str(sample_keepic)  # keepic
                 ])
 
         logger.info(f"Generated sample CSV file: {output_file}")
@@ -154,6 +155,8 @@ def main():
     common_parser.add_argument('--csv', required=True, help='Path to CSV file with secret data')
     common_parser.add_argument('--stage', type=str, default=default_environment,
                                help='Stage to be tested', choices=['dev', 'test', 'prod'])
+    common_parser.add_argument('--remote', action='store_true',
+                               help='Use remote Selenium Grid instead of local WebDriver')
 
     # Backup command
     backup_parser = subparsers.add_parser('backup', help='Backup secrets from CSV file',
@@ -174,7 +177,7 @@ def main():
         return
 
     logger.info(f"Starting secret {args.command} process")
-    results = process_secrets_file(args.csv, args.stage, args.command)
+    results = process_secrets_file(args.csv, args.stage, args.command, remote=getattr(args, 'remote', False))
 
     logger.info("=== Final Results ===")
     logger.info(f"Total records processed: {results['total']}")
