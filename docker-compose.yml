@@ -1,0 +1,9 @@
+services:
+  sv-test-scripts:
+    build: .
+    container_name: sv-test-scripts
+    volumes:
+      - .:/app
+    working_dir: /app
+    entrypoint: ["poetry", "run", "python"]
+    command: ["manage_secrets.py", "--help"]
