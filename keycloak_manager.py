@@ -19,7 +19,7 @@ load_dotenv()
 
 
 # Default values from environment variables
-DEFAULT_REALM = os.getenv('KEYCLOAK_REALM')
+# DEFAULT_REALM = os.getenv('KEYCLOAK_REALM')
 DEFAULT_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID')
 DEFAULT_CLIENT_SECRET = os.getenv('KEYCLOAK_CLIENT_SECRET')
 
@@ -55,6 +55,7 @@ class KcAdmin:
         self.stage = stage
         self.base_url = server_data.kc_url
         self.api_url = server_data.api_url
+        self.realm = server_data.realm
         self._client_id = client_id
         self._client_secret = client_secret
         self._client = httpx.AsyncClient()
@@ -67,18 +68,18 @@ class KcAdmin:
     async def __aexit__(self, *args):
         await self._client.aclose()
 
-    async def get_users(self, realm: str, page: int = 0, page_size: int = 100):
+    async def get_users(self, page: int = 0, page_size: int = 100):
         return await self._get(
-            f"{self.base_url}/admin/realms/{realm}/users?first={page}&max={page_size}"
+            f"{self.base_url}/admin/realms/{self.realm}/users?first={page}&max={page_size}"
         )
 
-    async def get_user(self, realm: str, user_id):
-        return await self._get(f"{self.base_url}/admin/realms/{realm}/users/{user_id}")
+    async def get_user(self, user_id):
+        return await self._get(f"{self.base_url}/admin/realms/{self.realm}/users/{user_id}")
 
-    async def create_user(self, realm: str, username: str, email: str, password: str, set_free_license: bool) -> bool:
+    async def create_user(self, username: str, email: str, password: str, set_free_license: bool) -> bool:
         try:
             response = await self._post(
-                f"{self.base_url}/admin/realms/{realm}/users",
+                f"{self.base_url}/admin/realms/{self.realm}/users",
                 json={
                     "username": username,
                     "email": email,
@@ -130,17 +131,17 @@ class KcAdmin:
             logger.error(f"Failed to create user {username}: {str(e)}")
             return False
 
-    async def delete_user(self, realm: str, username: str) -> bool:
+    async def delete_user(self, username: str) -> bool:
         try:
             # First, find the user
-            users = await self.get_users(realm, page_size=1000)
+            users = await self.get_users(page_size=1000)
             user = next((u for u in users if u["username"] == username), None)
 
             if not user:
                 logger.warning(f"User not found: {username}")
                 return False
 
-            await self._delete(f"{self.base_url}/admin/realms/{realm}/users/{user['id']}")
+            await self._delete(f"{self.base_url}/admin/realms/{self.realm}/users/{user['id']}")
             logger.info(f"User deleted successfully: {username}")
             return True
         except httpx.HTTPError as e:
@@ -193,9 +194,9 @@ class KcAdmin:
         return await self._client.delete(url)
 
 
-async def process_users(action: str, csv_file: str, realm: str,
-                        client_id: str, client_secret: str, set_free_license: bool):
-    async with KcAdmin(client_id, client_secret) as admin:
+async def process_users(action: str, csv_file: str, client_id: str,
+                        client_secret: str, set_free_license: bool, stage: str):
+    async with KcAdmin(client_id, client_secret, stage) as admin:
         with open(csv_file, 'r') as f:
             reader = csv.reader(f, delimiter=';')
             users = list(reader)
@@ -214,9 +215,9 @@ async def process_users(action: str, csv_file: str, realm: str,
             for username, password in batch:
                 if action == "create":
                     email = f"{username}@example.com"  # Generate email based on username
-                    task = admin.create_user(realm, username, email, password, set_free_license)
+                    task = admin.create_user(username, email, password, set_free_license)
                 else:
-                    task = admin.delete_user(realm, username)
+                    task = admin.delete_user(username)
                 tasks.append(task)
 
             results_batch = await asyncio.gather(*tasks)
@@ -265,17 +266,19 @@ def main():
     # Create command
     create_parser = subparsers.add_parser("create", help="Create users from CSV file")
     create_parser.add_argument("--csv", required=True, help="CSV file with username;password")
-    create_parser.add_argument("--realm", default=DEFAULT_REALM, help=f"Keycloak realm")
     create_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
     create_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
     create_parser.add_argument("--set-free-license", action='store_true', help="Automatically set free license")
+    create_parser.add_argument('--stage', type=str, default=default_environment,
+                               help='Stage to be managed', choices=['dev', 'test', 'pre'])
 
     # Delete command
     delete_parser = subparsers.add_parser("delete", help="Delete users from CSV file")
     delete_parser.add_argument("--csv", required=True, help="CSV file with username;password")
-    delete_parser.add_argument("--realm", default=DEFAULT_REALM, help=f"Keycloak realm")
     delete_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
     delete_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
+    delete_parser.add_argument('--stage', type=str, default=default_environment,
+                               help='Stage to be managed', choices=['dev', 'test', 'pre'])
 
     # Generate command
     generate_parser = subparsers.add_parser("generate", help="Generate CSV file with random users")
@@ -285,8 +288,8 @@ def main():
 
     args = parser.parse_args()
 
-    if args.command == "create":
-        if not (args.realm and args.client_id and args.client_secret):
+    if args.command in ("create", "delete"):
+        if not (args.client_id and args.client_secret):
             logger.error("Please specify all required params via CLI or environment variable")
             parser.print_help()
             return
@@ -294,24 +297,10 @@ def main():
         asyncio.run(process_users(
             args.command,
             args.csv,
-            args.realm,
             args.client_id,
             args.client_secret,
-            getattr(args, 'set_free_license', False)
-        ))
-    elif args.command == "delete":
-        if not (args.realm and args.client_id and args.client_secret):
-            logger.error("Please specify all required params via CLI or environment variable")
-            parser.print_help()
-            return
-
-        asyncio.run(process_users(
-            args.command,
-            args.csv,
-            args.realm,
-            args.client_id,
-            args.client_secret,
-            False
+            getattr(args, 'set_free_license', False),
+            args.stage
         ))
     elif args.command == "generate":
         users = generate_users(args.count, args.prefix)
