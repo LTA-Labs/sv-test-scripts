@@ -45,7 +45,7 @@ class OIDCAuth:
             'code_challenge_method': 'S256'
         }
 
-    async def kc_authenticate(self) -> Optional[dict]:
+    async def kc_authenticate(self, username: str = None, password: str = None) -> Optional[dict]:
         async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
             try:
                 # Build the authentication URL
@@ -70,8 +70,8 @@ class OIDCAuth:
 
                 # Add credentials
                 login_data = {
-                    "username": "sv-" + os.getenv('SV_USERNAME'),  # Adding sv- prefix is mandatory
-                    "password": os.getenv('SV_PASSWORD')
+                    "username": username or os.getenv('SV_USERNAME'),
+                    "password": password or os.getenv('SV_PASSWORD')
                 }
 
                 # Submit login form
@@ -160,8 +160,8 @@ class OIDCAuth:
                 return None
 
 
-async def main():
-    stage = 'prod'
+async def test():
+    stage = 'pre'
     auth = OIDCAuth(stage)
     auth_info = await auth.kc_authenticate()
     if auth_info:
@@ -180,4 +180,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test())

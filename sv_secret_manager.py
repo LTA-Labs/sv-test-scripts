@@ -339,7 +339,8 @@ class SecretVaultManager:
             return False
 
 
-def main(stage: str):
+def test():
+    stage: str = 'pre'
     # Example secret submission
     secret = Secret(
         name="Test Secret",
@@ -349,7 +350,7 @@ def main(stage: str):
         keepic_path="./keepic.jpg"
     )
 
-    with SecretVaultManager(stage=stage, headless=False) as manager:
+    with SecretVaultManager(stage=stage, remote=False) as manager:
         # Authenticate first
         if not manager.authenticate():
             logger.error("Authentication failed")
@@ -369,5 +370,4 @@ def main(stage: str):
 
 
 if __name__ == "__main__":
-    stage = 'dev'
-    main(stage)
+    test()

@@ -85,22 +85,22 @@ python manage_secrets.py generate --csv secrets.csv --num-records 5
 Backup existing secrets to a specified environment (e.g., production):
 
 ```bash
-python manage_secrets.py backup --csv secrets.csv --stage prod --local
+python manage_secrets.py backup --csv secrets.csv --stage pre --local
 ```
 
 - `--csv`: Path to the CSV file where secrets will be stored.
-- `--stage`: Target environment (e.g., `prod`, `dev`).
+- `--stage`: Target environment (e.g., `pre`, `dev`, `test`).
 - `--local`: Use local WebDriver instead of the Selenium Grid
 
 ### Restoring Secrets
 Restore secrets to a specified environment:
 
 ```bash
-python manage_secrets.py restore --csv secrets.csv --stage prod
+python manage_secrets.py restore --csv secrets.csv --stage pre
 ```
 
 - `--csv`: Path to the CSV file containing the secrets.
-- `--stage`: Target environment (e.g., `prod`, `dev`, `test`).
+- `--stage`: Target environment (e.g., `pre`, `dev`, `test`).
 
 ---
 

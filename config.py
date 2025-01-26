@@ -76,7 +76,7 @@ STAGES = {
         realm='secret-vault',
         client_id='sv-web-portal'
     ),
-    'prod': ServerData(
+    'pre': ServerData(
         portal_url=DOMAIN_TEMPLATE.format('app-pre'),
         api_url=DOMAIN_TEMPLATE.format('wapi-pre'),
         kc_url=DOMAIN_TEMPLATE.format('auth-pre'),
@@ -85,4 +85,4 @@ STAGES = {
     )
 }
 
-default_environment = 'prod'
+default_environment = 'pre'

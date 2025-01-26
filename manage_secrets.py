@@ -154,7 +154,7 @@ def main():
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument('--csv', required=True, help='Path to CSV file with secret data')
     common_parser.add_argument('--stage', type=str, default=default_environment,
-                               help='Stage to be tested', choices=['dev', 'test', 'prod'])
+                               help='Stage to be tested', choices=['dev', 'test', 'pre'])
     common_parser.add_argument('--local', action='store_true',
                                help='Use local WebDriver instead of remote Selenium Grid')
 
