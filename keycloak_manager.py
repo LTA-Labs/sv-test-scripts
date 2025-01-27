@@ -127,7 +127,7 @@ class KcAdmin:
                         response = await self._client.post(
                             url=f"{self.api_url}/license/select_license",
                             json={
-                                "license_id": "portal_lite-nWqbR",
+                                "license_id": "portal_lite" + ("" if self.stage == 'pre' else "-nWqbR"),
                                 "is_yearly": False,
                                 "lang": "en",
                                 "coupon": ""
