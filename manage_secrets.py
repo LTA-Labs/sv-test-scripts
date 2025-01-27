@@ -5,7 +5,7 @@ import random
 from pathlib import Path
 from typing import Dict
 from sv_secret_manager import SecretVaultManager, Secret
-from config import logger, logging_file, default_environment
+from config import logger, logging_file, DEFAULT_STAGE
 
 
 def validate_file_path(file_path: str) -> bool:
@@ -155,7 +155,7 @@ def main():
     # Common arguments for backup and restore commands
     common_parser = argparse.ArgumentParser(add_help=False)
     common_parser.add_argument('--csv', required=True, help='Path to CSV file with secret data')
-    common_parser.add_argument('--stage', type=str, default=default_environment,
+    common_parser.add_argument('--stage', type=str, default=DEFAULT_STAGE,
                                help='Stage to be tested', choices=['dev', 'test', 'pre'])
     common_parser.add_argument('--local', action='store_true',
                                help='Use local WebDriver instead of remote Selenium Grid')

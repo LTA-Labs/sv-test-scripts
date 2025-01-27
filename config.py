@@ -14,10 +14,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("sv-test-scripts")
 
-
-# Default image URL for missing files
-DEFAULT_IMAGE_URL = "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U"
-
 # Selenium configuration
 SELENIUM_CONFIG = {
     'local': {
@@ -85,4 +81,7 @@ STAGES = {
     )
 }
 
-default_environment = 'pre'
+DEFAULT_STAGE = 'pre'
+DEFAULT_EMAIL_TEST_DOMAIN = "@stressandloadtest.com"
+# Default image URL for missing files
+DEFAULT_IMAGE_URL = "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U"

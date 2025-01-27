@@ -10,11 +10,11 @@ import string
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from dotenv import load_dotenv
-from email.utils import parseaddr
 from typing import List, Tuple
 
-from config import default_environment, logger, ServerData, STAGES
+from config import DEFAULT_STAGE, DEFAULT_EMAIL_TEST_DOMAIN, logger, ServerData, STAGES
 from sv_oidc_auth import OIDCAuth
+from utils import validate_username
 
 load_dotenv()
 
@@ -22,8 +22,6 @@ load_dotenv()
 # Default values from environment variables
 DEFAULT_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID')
 DEFAULT_CLIENT_SECRET = os.getenv('KEYCLOAK_CLIENT_SECRET')
-
-DEFAULT_EMAIL_TEST_DOMAIN = "@stressandloadtest.com"
 
 
 @dataclass
@@ -50,7 +48,7 @@ class KcUser:
 
 class KcAdmin:
 
-    def __init__(self, client_id: str, client_secret: str, stage: str = default_environment):
+    def __init__(self, client_id: str, client_secret: str, stage: str = DEFAULT_STAGE):
         server_data: ServerData = STAGES.get(stage)
         if server_data is None:
             raise ValueError(f"Stage value '{stage}' is not valid")
@@ -70,21 +68,6 @@ class KcAdmin:
     async def __aexit__(self, *args):
         await self._client.aclose()
 
-    @staticmethod
-    def validate_username(username: str, check_sv_prefix=False) -> str | None:
-        """Simple validator that checks username format"""
-        if not username:
-            return
-        if check_sv_prefix and not username.startswith("sv-"):
-            username = 'sv-' + username
-
-        name, address = parseaddr(username)
-        if '@' in address:
-            if '.' in address.split('@')[-1] and '.' not in [address[0], address[-1]]:
-                return username
-            return  # Username is in an invalid email format
-        return username + DEFAULT_EMAIL_TEST_DOMAIN
-
     async def get_users(self, page: int = 0, page_size: int = 100):
         return await self._get(
             f"{self.base_url}/admin/realms/{self.realm}/users?first={page}&max={page_size}"
@@ -95,10 +78,10 @@ class KcAdmin:
 
     async def create_user(self, username: str, password: str, email: str = None, set_free_license: bool = False) -> bool:
         try:
-            email = self.validate_username(email) or self.validate_username(username)
+            email = validate_username(email) or validate_username(username)
             if email is None:
                 raise ValueError("Username is not valid")
-            username = self.validate_username(username, check_sv_prefix=True)
+            username = validate_username(username, check_sv_prefix=True)
             response = await self._post(
                 f"{self.base_url}/admin/realms/{self.realm}/users",
                 json={
@@ -155,7 +138,7 @@ class KcAdmin:
     async def delete_user(self, username: str) -> bool:
         try:
             # First, find the user
-            username = self.validate_username(username, check_sv_prefix=True)
+            username = validate_username(username, check_sv_prefix=True)
             users = await self.get_users(page_size=1000)
             user = next((u for u in users if u["username"] == username), None)
 
@@ -296,7 +279,7 @@ def main():
     create_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
     create_parser.add_argument("--not-free-license", action='store_true',
                                help="Don't automatically set the free license to this user")
-    create_parser.add_argument('--stage', type=str, default=default_environment,
+    create_parser.add_argument('--stage', type=str, default=DEFAULT_STAGE,
                                help='Stage to be managed', choices=['dev', 'test', 'pre'])
 
     # Delete command
@@ -304,7 +287,7 @@ def main():
     delete_parser.add_argument("--csv", required=True, help="CSV file with username;password")
     delete_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
     delete_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
-    delete_parser.add_argument('--stage', type=str, default=default_environment,
+    delete_parser.add_argument('--stage', type=str, default=DEFAULT_STAGE,
                                help='Stage to be managed', choices=['dev', 'test', 'pre'])
 
     # Generate command

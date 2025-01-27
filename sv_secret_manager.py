@@ -13,7 +13,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 from typing import Optional
 
-from config import default_environment, DEFAULT_IMAGE_URL, logger, SELENIUM_CONFIG, ServerData, STAGES
+from config import DEFAULT_STAGE, DEFAULT_IMAGE_URL, logger, SELENIUM_CONFIG, ServerData, STAGES
 
 load_dotenv()
 
@@ -28,7 +28,7 @@ class Secret:
 
 
 class SecretVaultManager:
-    def __init__(self, stage: str = default_environment, remote: bool = False):
+    def __init__(self, stage: str = DEFAULT_STAGE, remote: bool = False):
         server_data: ServerData = STAGES.get(stage)
         if server_data is None:
             raise ValueError(f"Stage value '{stage}' is not valid")
@@ -339,8 +339,8 @@ class SecretVaultManager:
             return False
 
 
-def test():
-    stage: str = 'pre'
+def main():
+    stage: str = 'dev'
     # Example secret submission
     secret = Secret(
         name="Test Secret",
@@ -370,4 +370,4 @@ def test():
 
 
 if __name__ == "__main__":
-    test()
+    main()

@@ -10,13 +10,14 @@ from dotenv import load_dotenv
 from typing import Optional
 from urllib.parse import urlencode, parse_qs
 
-from config import logger, default_environment, ServerData, STAGES
+from config import logger, DEFAULT_STAGE, ServerData, STAGES
+from utils import validate_username
 
 load_dotenv()
 
 
 class OIDCAuth:
-    def __init__(self, stage: str = default_environment):
+    def __init__(self, stage: str = DEFAULT_STAGE):
         server_data: ServerData = STAGES.get(stage)
         if server_data is None:
             raise ValueError(f"Stage value '{stage}' is not valid")
@@ -70,7 +71,7 @@ class OIDCAuth:
 
                 # Add credentials
                 login_data = {
-                    "username": username or os.getenv('SV_USERNAME'),
+                    "username": validate_username(username or os.getenv('SV_USERNAME'), check_sv_prefix=True),
                     "password": password or os.getenv('SV_PASSWORD')
                 }
 
