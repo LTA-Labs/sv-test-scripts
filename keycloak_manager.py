@@ -149,29 +149,34 @@ class KcAdmin:
             return False
 
     def _get_token(self):
-        response: httpx.Response = httpx.post(
-            f"{self.base_url}/realms/master/protocol/openid-connect/token",
-            data={
-                "scope": "openid",
-                "grant_type": "client_credentials",
-                "client_id": self._client_id,
-                "client_secret": self._client_secret,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        now = datetime.now().timestamp()
-        json_data = response.json()
+        try:
+            response: httpx.Response = httpx.post(
+                f"{self.base_url}/realms/master/protocol/openid-connect/token",
+                data={
+                    "scope": "openid",
+                    "grant_type": "client_credentials",
+                    "client_id": self._client_id,
+                    "client_secret": self._client_secret,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            response.raise_for_status()
+            now = datetime.now().timestamp()
+            json_data = response.json()
 
-        token = AccessToken(
-            access_token=json_data["access_token"],
-            token_type=json_data["token_type"],
-            expires_in=json_data["expires_in"],
-            issue_at=now,
-        )
-        self._token = token
-        self._client.headers.update(
-            {"Authorization": f"{token.token_type} {token.access_token}"}
-        )
+            token = AccessToken(
+                access_token=json_data["access_token"],
+                token_type=json_data["token_type"],
+                expires_in=json_data["expires_in"],
+                issue_at=now,
+            )
+            self._token = token
+            self._client.headers.update(
+                {"Authorization": f"{token.token_type} {token.access_token}"}
+            )
+        except httpx.HTTPError as e:
+            logger.error(f"Failed to get admin token: {str(e)}")
+            raise e
 
     async def _get(self, url, as_json=True):
         if not self._token.is_valid():
@@ -214,7 +219,7 @@ async def process_users(action: str, csv_file: str, client_id: str,
             tasks = []
             for username, password in batch:
                 if action == "create":
-                    email = f"{username}@example.com"  # Generate email based on username
+                    email = f"{username}@example.com"
                     task = admin.create_user(username, email, password, set_free_license)
                 else:
                     task = admin.delete_user(username)
