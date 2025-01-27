@@ -10,6 +10,7 @@ import string
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from dotenv import load_dotenv
+from email.utils import parseaddr
 from typing import List, Tuple
 
 from config import default_environment, logger, ServerData, STAGES
@@ -19,9 +20,10 @@ load_dotenv()
 
 
 # Default values from environment variables
-# DEFAULT_REALM = os.getenv('KEYCLOAK_REALM')
 DEFAULT_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID')
 DEFAULT_CLIENT_SECRET = os.getenv('KEYCLOAK_CLIENT_SECRET')
+
+DEFAULT_EMAIL_TEST_DOMAIN = "@stressandloadtest.com"
 
 
 @dataclass
@@ -68,6 +70,21 @@ class KcAdmin:
     async def __aexit__(self, *args):
         await self._client.aclose()
 
+    @staticmethod
+    def validate_username(username: str, check_sv_prefix=False) -> str | None:
+        """Simple validator that checks username format"""
+        if not username:
+            return
+        if check_sv_prefix and not username.startswith("sv-"):
+            username = 'sv-' + username
+
+        name, address = parseaddr(username)
+        if '@' in address:
+            if '.' in address.split('@')[-1] and '.' not in [address[0], address[-1]]:
+                return username
+            return  # Username is in an invalid email format
+        return username + DEFAULT_EMAIL_TEST_DOMAIN
+
     async def get_users(self, page: int = 0, page_size: int = 100):
         return await self._get(
             f"{self.base_url}/admin/realms/{self.realm}/users?first={page}&max={page_size}"
@@ -76,8 +93,12 @@ class KcAdmin:
     async def get_user(self, user_id):
         return await self._get(f"{self.base_url}/admin/realms/{self.realm}/users/{user_id}")
 
-    async def create_user(self, username: str, email: str, password: str, set_free_license: bool) -> bool:
+    async def create_user(self, username: str, password: str, email: str = None, set_free_license: bool = False) -> bool:
         try:
+            email = self.validate_username(email) or self.validate_username(username)
+            if email is None:
+                raise ValueError("Username is not valid")
+            username = self.validate_username(username, check_sv_prefix=True)
             response = await self._post(
                 f"{self.base_url}/admin/realms/{self.realm}/users",
                 json={
@@ -134,6 +155,7 @@ class KcAdmin:
     async def delete_user(self, username: str) -> bool:
         try:
             # First, find the user
+            username = self.validate_username(username, check_sv_prefix=True)
             users = await self.get_users(page_size=1000)
             user = next((u for u in users if u["username"] == username), None)
 
@@ -219,8 +241,7 @@ async def process_users(action: str, csv_file: str, client_id: str,
             tasks = []
             for username, password in batch:
                 if action == "create":
-                    email = f"{username}@example.com"
-                    task = admin.create_user(username, email, password, set_free_license)
+                    task = admin.create_user(username, password, set_free_license=set_free_license)
                 else:
                     task = admin.delete_user(username)
                 tasks.append(task)
@@ -234,13 +255,13 @@ async def process_users(action: str, csv_file: str, client_id: str,
         logger.info(f"Operation completed: {results}")
 
 
-def generate_users(count: int, prefix: str = "user", password_length: int = 12) -> List[Tuple[str, str]]:
+def generate_users(count: int, prefix: str = "user", password_length: int = 8) -> List[Tuple[str, str]]:
     if password_length < 8:
         raise ValueError("Password length must be at least 8 characters")
 
     users = []
     for i in range(1, count + 1):
-        username = f"{prefix}{i}"
+        username = f"{prefix}{i}{DEFAULT_EMAIL_TEST_DOMAIN}"
 
         # Ensure password contains at least one capital letter, one digit, and one special character
         uppercase = random.choice(string.ascii_uppercase)
@@ -273,7 +294,8 @@ def main():
     create_parser.add_argument("--csv", required=True, help="CSV file with username;password")
     create_parser.add_argument("--client-id", default=DEFAULT_CLIENT_ID, help=f"Client ID")
     create_parser.add_argument("--client-secret", default=DEFAULT_CLIENT_SECRET, help="Client Secret")
-    create_parser.add_argument("--set-free-license", action='store_true', help="Automatically set free license")
+    create_parser.add_argument("--not-free-license", action='store_true',
+                               help="Don't automatically set the free license to this user")
     create_parser.add_argument('--stage', type=str, default=default_environment,
                                help='Stage to be managed', choices=['dev', 'test', 'pre'])
 
@@ -304,7 +326,7 @@ def main():
             args.csv,
             args.client_id,
             args.client_secret,
-            getattr(args, 'set_free_license', False),
+            not getattr(args, 'not_free_license', False),
             args.stage
         ))
     elif args.command == "generate":

@@ -70,7 +70,7 @@ class OIDCAuth:
 
                 # Add credentials
                 login_data = {
-                    "username": "sv-" + (username or os.getenv('SV_USERNAME')),
+                    "username": username or os.getenv('SV_USERNAME'),
                     "password": password or os.getenv('SV_PASSWORD')
                 }
 
@@ -161,7 +161,7 @@ class OIDCAuth:
 
 
 async def main():
-    stage = 'pre'
+    stage = 'dev'
     auth = OIDCAuth(stage)
     auth_info = await auth.kc_authenticate()
     if auth_info:
