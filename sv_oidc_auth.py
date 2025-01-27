@@ -160,7 +160,7 @@ class OIDCAuth:
                 return None
 
 
-async def test():
+async def main():
     stage = 'pre'
     auth = OIDCAuth(stage)
     auth_info = await auth.kc_authenticate()
@@ -180,4 +180,4 @@ async def test():
 
 
 if __name__ == "__main__":
-    asyncio.run(test())
+    asyncio.run(main())
