@@ -46,7 +46,7 @@ class OIDCAuth:
         }
 
     async def kc_authenticate(self, username: str = None, password: str = None) -> Optional[dict]:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
             try:
                 # Build the authentication URL
                 redirect_uri = f"{self.base_url}/home"
@@ -70,7 +70,7 @@ class OIDCAuth:
 
                 # Add credentials
                 login_data = {
-                    "username": username or os.getenv('SV_USERNAME'),
+                    "username": "sv-" + (username or os.getenv('SV_USERNAME')),
                     "password": password or os.getenv('SV_PASSWORD')
                 }
 
