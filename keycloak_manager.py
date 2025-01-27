@@ -5,16 +5,13 @@ import asyncio
 import csv
 import httpx
 import os
-import random
-import string
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from dotenv import load_dotenv
-from typing import List, Tuple
 
-from config import DEFAULT_STAGE, DEFAULT_EMAIL_TEST_DOMAIN, logger, ServerData, STAGES
+from config import DEFAULT_STAGE, logger, ServerData, STAGES
 from sv_oidc_auth import OIDCAuth
-from utils import validate_username
+from utils import generate_users, validate_username
 
 load_dotenv()
 
@@ -236,36 +233,6 @@ async def process_users(action: str, csv_file: str, client_id: str,
             logger.info(f"Progress: {i + len(batch)}/{len(users)}")
 
         logger.info(f"Operation completed: {results}")
-
-
-def generate_users(count: int, prefix: str = "user", password_length: int = 8) -> List[Tuple[str, str]]:
-    if password_length < 8:
-        raise ValueError("Password length must be at least 8 characters")
-
-    users = []
-    for i in range(1, count + 1):
-        username = f"{prefix}{i}{DEFAULT_EMAIL_TEST_DOMAIN}"
-
-        # Ensure password contains at least one capital letter, one digit, and one special character
-        uppercase = random.choice(string.ascii_uppercase)
-        digit = random.choice(string.digits)
-        special = random.choice("!@#$%^&*()-_=+.")
-
-        # Fill the rest of the password with random characters
-        remaining_length = password_length - 3
-        other_chars = ''.join(random.choices(
-            string.ascii_letters + string.digits + "!@#$%^&*()-_=+.",
-            k=remaining_length
-        ))
-
-        # Combine all parts and shuffle to randomize
-        password = list(uppercase + digit + special + other_chars)
-        random.shuffle(password)
-        password = ''.join(password)
-
-        users.append((username, password))
-
-    return users
 
 
 def main():
