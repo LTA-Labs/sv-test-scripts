@@ -1,4 +1,6 @@
 import os
+import time
+
 import requests
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,7 +15,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 from typing import Optional
 
-from config import DEFAULT_STAGE, DEFAULT_IMAGE_URL, logger, SELENIUM_CONFIG, ServerData, STAGES
+from config import (DEFAULT_IMAGE_URL, DEFAULT_SELENIUM_TIMEOUT, DEFAULT_STAGE,
+                    logger, SELENIUM_CONFIG, ServerData, STAGES)
+from utils import validate_username
 
 load_dotenv()
 
@@ -62,7 +66,7 @@ class SecretVaultManager:
                 self.driver = webdriver.Chrome(service=service, options=options)
                 logger.info("Using local Chrome WebDriver")
 
-            self.wait = WebDriverWait(self.driver, 30)
+            self.wait = WebDriverWait(self.driver, DEFAULT_SELENIUM_TIMEOUT)
 
         except Exception as e:
             logger.error(f"Failed to initialize WebDriver: {str(e)}")
@@ -144,7 +148,7 @@ class SecretVaultManager:
                 return False
 
             # Get credentials from environment variables if not passed as arguments
-            username = username or os.getenv('SV_USERNAME')
+            username = validate_username(username or os.getenv('SV_USERNAME'))
             password = password or os.getenv('SV_PASSWORD')
 
             if not username or not password:
@@ -219,6 +223,8 @@ class SecretVaultManager:
             # type_button.click()
             # Prevents that button from being clickable because the tour is being displayed overlaid on it
             self.driver.execute_script("arguments[0].click();", type_button)
+            # Type button now have animations. Let's wait 1 second to look for the next element to be visible
+            time.sleep(1)
 
             # Handle secret content based on type
             if secret.type == 'text':
