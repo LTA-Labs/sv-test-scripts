@@ -5,5 +5,5 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    entrypoint: ["poetry", "run", "python"]
+    entrypoint: ["python"]
     command: ["manage_secrets.py", "--help"]
