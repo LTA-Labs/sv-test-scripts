@@ -5,7 +5,7 @@ import random
 from pathlib import Path
 from typing import Dict
 from sv_secret_manager import SecretVaultManager, Secret
-from config import logger, logging_file, DEFAULT_STAGE
+from config import DEFAULT_STAGE, logger, logging_file, REMOTES_FILES_URL
 from utils import generate_users
 
 
@@ -105,7 +105,6 @@ def generate_sample_csv(input_file: str, output_file: str, num_records: int = 5)
     try:
         headers = ['username', 'password', 'secret_type', 'secret', 'secret_desc', 'keepic']
 
-        sample_content = Path('sample_secret.jpg')
         sample_keepic = Path('sample_keepic.jpg')
 
         if input_file and Path(input_file).is_file():
@@ -135,9 +134,9 @@ def generate_sample_csv(input_file: str, output_file: str, num_records: int = 5)
 
                 # Generate secret content based on type
                 if secret_type == 'text':
-                    secret_content = f'This is secret #{i + 1}'
+                    secret_content = f'This is text secret #{i + 1}'
                 else:
-                    secret_content = str(sample_content)
+                    secret_content = random.choice(list(REMOTES_FILES_URL.keys()))
 
                 writer.writerow([
                     username,
@@ -164,7 +163,7 @@ def main():
     generate_parser = subparsers.add_parser('generate', help='Generate a sample CSV file')
     generate_parser.add_argument('--users-csv', default=None, help='Path to users CSV file')
     generate_parser.add_argument('--output-csv', required=True, help='Path to output CSV file')
-    generate_parser.add_argument('--num-records', type=int, default=5,
+    generate_parser.add_argument('--count', type=int, default=5,
                                  help='Number of records to generate')
 
     # Common arguments for backup and restore commands
@@ -190,7 +189,7 @@ def main():
         return
 
     if args.command == 'generate':
-        generate_sample_csv(args.users_csv, args.output_csv, args.num_records)
+        generate_sample_csv(args.users_csv, args.output_csv, args.count)
         return
 
     logger.info(f"Starting secret {args.command} process")

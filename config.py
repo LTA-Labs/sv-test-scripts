@@ -86,3 +86,9 @@ DEFAULT_EMAIL_TEST_DOMAIN = "@stressandloadtest.com"
 DEFAULT_IMAGE_URL = "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U"
 DEFAULT_STAGE = 'pre'
 DEFAULT_SELENIUM_TIMEOUT = 60
+
+REMOTES_FILES_URL = {
+    'PDF10.pdf': 'https://files.testfile.org/PDF/10MB-TESTFILE.ORG.pdf',
+    'PDF50.pdf': 'https://files.testfile.org/PDF/50MB-TESTFILE.ORG.pdf',
+    'PDF100.pdf': 'https://files.testfile.org/PDF/100MB-TESTFILE.ORG.pdf',
+}

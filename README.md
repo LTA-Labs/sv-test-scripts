@@ -86,12 +86,12 @@ python manage_secrets.py generate --output-csv secrets.csv --num-records 5
 Generate secrets using the users declared in `keycloak_manager.py generate` command
 
 ```bash
-python manage_secrets.py generate --users-csv users.csv --output-csv secrets.csv --num-records 5
+python manage_secrets.py generate --users-csv users.csv --output-csv secrets.csv --count 5
 ```
 
 - `--users-csv`: Path to the users CSV file.
 - `--output-csv`: Path to the output CSV file.
-- `--num-records`: Number of records to generate.
+- `--count`: Number of records to generate.
 
 ### Backing Up Secrets
 Backup existing secrets to a specified environment (e.g., test):

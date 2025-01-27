@@ -17,12 +17,12 @@ def generate_users(count: int, prefix: str = "user", password_length: int = 8) -
         # Ensure password contains at least one capital letter, one digit, and one special character
         uppercase = random.choice(string.ascii_uppercase)
         digit = random.choice(string.digits)
-        special = random.choice("!@#$%^&*()-_=+.")
+        special = random.choice("!.")
 
         # Fill the rest of the password with random characters
         remaining_length = password_length - 3
         other_chars = ''.join(random.choices(
-            string.ascii_letters + string.digits + "!@#$%^&*()-_=+.",
+            string.ascii_letters + string.digits,  # + "!@#$%^&*()-_=+.",
             k=remaining_length
         ))
 

@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from typing import Optional
 
 from config import (DEFAULT_IMAGE_URL, DEFAULT_SELENIUM_TIMEOUT, DEFAULT_STAGE,
-                    logger, SELENIUM_CONFIG, ServerData, STAGES)
+                    logger, REMOTES_FILES_URL, SELENIUM_CONFIG, ServerData, STAGES)
 from utils import validate_username
 
 load_dotenv()
@@ -85,21 +85,22 @@ class SecretVaultManager:
         """Validate file existence and return file path or download default image"""
         path = Path(file_path)
         if not path.exists():
-            logger.warning(f"{file_type} file not found: {file_path}, downloading default image")
+            url = REMOTES_FILES_URL.get(path.name, DEFAULT_IMAGE_URL)
+            logger.warning(f"{file_type} file not found: {file_path}, downloading corresponding file")
             try:
                 # Create parent directories if they don't exist
                 path.parent.mkdir(parents=True, exist_ok=True)
 
                 # Download the default image
-                response = requests.get(DEFAULT_IMAGE_URL)
+                response = requests.get(url)
                 response.raise_for_status()
                 with open(path, 'wb') as f:
                     f.write(response.content)
 
-                logger.info(f"Successfully downloaded default image to {file_path}")
+                logger.info(f"Successfully downloaded file to {file_path}")
                 return str(path)
             except Exception as e:
-                logger.error(f"Failed to download default image: {str(e)}")
+                logger.error(f"Failed to download file from {url}: {str(e)}")
                 raise e
         return str(path)
 
